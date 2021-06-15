@@ -11,7 +11,7 @@ from .training_log import training_log_reader
 from datetime import datetime
 
 
-def load_openml_dataset(dataset_id, data_dir=None, random_state=0):
+def load_openml_dataset(dataset_id, data_dir=None, random_state=0, dataset_format='array'):
     '''Load dataset from open ML.
 
     If the file is not cached locally, download it from open ML.
@@ -48,14 +48,14 @@ def load_openml_dataset(dataset_id, data_dir=None, random_state=0):
     print('Dataset name:', dataset.name)
     X, y, * \
         __ = dataset.get_data(
-            target=dataset.default_target_attribute, dataset_format='array')
+            target=dataset.default_target_attribute, dataset_format=dataset_format)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, random_state=random_state)
-    print(
-        'X_train.shape: {}, y_train.shape: {};\nX_test.shape: {}, y_test.shape: {}'.format(
-            X_train.shape, y_train.shape, X_test.shape, y_test.shape,
-        )
-    )
+    # print(
+    #     'X_train.shape: {}, y_train.shape: {};\nX_test.shape: {}, y_test.shape: {}'.format(
+    #         X_train.shape, y_train.shape, X_test.shape, y_test.shape,
+    #     )
+    # )
     return X_train, X_test, y_train, y_test
 
 
