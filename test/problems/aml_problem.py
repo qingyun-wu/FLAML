@@ -34,6 +34,7 @@ def add_res(log_file_name, params_dic):
         f.write(json.dumps(params_dic))
         f.write('\n')
 
+
 class Problem:
 
 
@@ -480,6 +481,55 @@ class AutoML(Problem):
                 },    
             }
     
+    class XGB_BS_NOINIT(XGB_BlendSearch):
+
+
+        @classmethod
+        def search_space(cls, data_size, **params): 
+            upper = min(32768,int(data_size))
+            return {
+                'n_estimators': {
+                    'domain': tune.qloguniform(lower=4, upper=upper, q=1),
+                },
+                'max_leaves': {
+                    'domain': tune.qloguniform(lower=4, upper=upper, q=1),  
+                },
+                'min_child_weight': {
+                    'domain': tune.loguniform(lower=0.001, upper=20.0),
+                    'init_value': 20.0,
+                },
+                'learning_rate': {
+                    'domain': tune.loguniform(lower=0.01, upper=1.0),
+                    'init_value': 0.1,
+                },
+                'subsample': {
+                    'domain': tune.uniform(lower=0.6, upper=1.0),
+                    
+                },                        
+                'colsample_bylevel': {
+                    'domain': tune.uniform(lower=0.6, upper=1.0),
+                    
+                },                        
+                'colsample_bytree': {
+                    'domain': tune.uniform(lower=0.7, upper=1.0),
+                  
+                },                        
+                'reg_alpha': {
+                    'domain': tune.loguniform(lower=1e-10, upper=1.0),
+                    
+                },    
+                'reg_lambda': {
+                    'domain': tune.loguniform(lower=1e-10, upper=1.0),
+                    
+                },  
+                'booster': {
+                    'domain': tune.choice(['gbtree', 'gblinear']),
+                },   
+                'tree_method': {
+                    'domain': tune.choice(['auto', 'approx', 'hist']),
+                },    
+            }
+    
 
     class XGB_BlendSearch_Large(XGB_BlendSearch):
 
@@ -744,6 +794,8 @@ class AutoML(Problem):
             estimator = AutoML.XGB_BlendSearch
         elif name == 'xgb_blendsearch_large':
             estimator = AutoML.XGB_BlendSearch_Large
+        elif name == 'xgb_bs_noinit':
+            estimator = AutoML.XGB_BS_NOINIT
         elif name == 'xgb_hpolib':
             estimator = AutoML.XGB_HPOLib
         elif 'dt' in name or 'deeptable' in name:
@@ -1024,9 +1076,14 @@ class AutoML(Problem):
         # print('eval method', eval_method)
         return eval_method
 
+    @property
+    def low_cost_partial_config(self):
+        return self._low_cost_partial_config
+    
     def __init__(self, dataset, estimator, fold, n_jobs, time_budget = None,
      resampling_strategy = None, **args): 
         
+        # super().__isnit__(**args)
         self.name = f'{dataset}-{estimator}'
         self.time_budget = time_budget
         self.transform = True
@@ -1061,6 +1118,7 @@ class AutoML(Problem):
         # super().__init__(**args)
         print('estimator', self.estimator)
         self._setup_search()
+        self._low_cost_partial_config = None
 
         print('setup search space', self._search_space)
 
@@ -1132,8 +1190,7 @@ class AutoML(Problem):
                     pickle.dump(dataset, f, pickle.HIGHEST_PROTOCOL)
             # X, y, cat_, _ = dataset.get_data(task.target_name, 
             #     dataset_format='array', include_ignore_attributes = True)
-            X, y, cat, _ = dataset.get_data(task.target_name, 
-                include_ignore_attributes = True)
+            X, y, cat, _ = dataset.get_data(task.target_name)
             train_indices, test_indices = task.get_train_test_split_indices(
                     repeat=0,
                     fold=fold,

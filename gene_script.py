@@ -12,6 +12,16 @@
 ### Command to run all datasets
 # python gene_script.py  -l xgb_cat -t 60.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_cat_all.sh -f 0 1 2 3 4 
 # python gene_script.py  -l xgb_cat -t 60.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_cat_all.sh -agg -plot_only
+# python gene_script.py  -l xgb_blendsearch -t 600.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_bs_all.sh -f 0
+# python gene_script.py  -l xgb_blendsearch -t 600.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_bs_all_plot.sh -f 0 -agg -plot_only
+
+# python gene_script.py  -l xgb_bs_noinit -t 600.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_bs_noinit.sh -f 0
+# python gene_script.py  -l xgb_bs_noinit -t 600.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_bs_all_plot.sh -f 0 -agg -plot_only
+
+
+# python gene_script.py  -l xgb_blendsearch -t 3600.0  -m Optuna CFO BlendSearch+Optuna -d 'bank' 'mfeat' 'cnae' -filename xgb_bs_example.sh -f 0 1 2 3 4 
+# python gene_script.py  -l xgb_blendsearch -t 600.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_bs_all.sh -f 0
+
 import argparse
 
 if __name__=='__main__':
