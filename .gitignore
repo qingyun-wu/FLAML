@@ -156,3 +156,6 @@ automl.pkl
 
 .idea/*
 .DS_Store
+/stdout/*
+*.pkl
+*.pdf
