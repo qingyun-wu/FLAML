@@ -21,7 +21,13 @@
 
 # python gene_script.py  -l xgb_blendsearch -t 3600.0  -m Optuna CFO BlendSearch+Optuna -d 'bank' 'mfeat' 'cnae' -filename xgb_bs_example.sh -f 0 1 2 3 4 
 # python gene_script.py  -l xgb_blendsearch -t 600.0  -m Optuna CFO BlendSearch+Optuna -filename xgb_bs_all.sh -f 0
+# python gene_script.py  -l xgb_blendsearch -t 3600.0  -m Optuna CFO BlendSearch+Optuna -d 'bank' 'mfeat' 'cnae' -filename xgb_bs_example_plot.sh -f 0 -plot_only -agg
 
+#python gene_script.py  -l xgb_blendsearch -t 3600.0  -m Optuna CFO BlendSearch+Optuna -d 'bank' 'mfeat' 'cnae' -c 4 -c_trial 2 -filename xgb_bs_example_paral.sh -f 0 
+#python gene_script.py  -l xgb_bs_noinit -t 3600.0  -m Optuna CFO BlendSearch+Optuna -d 'bank' 'mfeat' 'cnae' -c 4 -c_trial 2 -filename xgb_bs_noinit_example_paral.sh -f 0 
+
+#python gene_script.py  -l xgb_blendsearch -t 1800.0  -m Optuna CFO BlendSearch+Optuna -d 'bank' 'mfeat' 'cnae' -c 4 -c_trial 2 -filename xgb_bs_example_paral_plot.sh -f 0  -plot_only -agg
+#python gene_script.py  -l xgb_bs_noinit -t 1800.0  -m Optuna CFO BlendSearch+Optuna -d 'bank' 'mfeat' 'cnae' -c 4 -c_trial 2 -filename xgb_bs_noinit_example_paral_plot.sh -f 0  -plot_only -agg
 import argparse
 
 if __name__=='__main__':
