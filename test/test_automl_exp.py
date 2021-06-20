@@ -25,7 +25,7 @@ try:
     from flaml import BlendSearch
 except:
     print("pip install flaml[blendsearch,ray,openml]")
-    
+# pip install -e .[blendsearch,ray,openml]
 import logging
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ def _test_problem_parallel(problem, time_budget_s= 120, n_total_pu=4, n_per_tria
         resource_schedule=resource_schedule, log_file_name=log_file_name, 
         total_budget=time_budget_s)
 
-    # ray.init(num_cpus=n_total_pu, num_gpus=0) #n_total_pu
+    ray.init(num_cpus=n_total_pu, num_gpus=0) #n_total_pu
     if isinstance(init_config, list):
         points_to_evaluate=init_config
     else:
