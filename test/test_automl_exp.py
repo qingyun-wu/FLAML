@@ -17,38 +17,31 @@ import pandas as pd
 from functools import partial
 import os 
 import time
+import logging
 RANDOMSEED = 1024
-
 try:
     import ray
     import flaml
     from flaml import BlendSearch
-except:
+except ImportError:
     print("pip install flaml[blendsearch,ray,openml]")
-# pip install -e .[blendsearch,ray,openml]
-import logging
 logger = logging.getLogger(__name__)
 
 
-def _test_problem_parallel(problem, time_budget_s= 120, n_total_pu=4, n_per_trial_pu=1, method='BlendSearch', \
-    log_dir_address = 'logs/', log_file_name='logs/example.log', ls_seed=20):
+def _test_problem_parallel(problem, time_budget_s=120, n_total_pu=4,
+                           n_per_trial_pu=1, method='BlendSearch',
+                           log_dir_address='logs/', log_file_name='logs/example.log',
+                           ls_seed=20):
     metric = 'loss'
     mode = 'min'
-    resources_per_trial = {"cpu":n_per_trial_pu, "gpu":0 } #n_per_trial_pu
-    try:
-        import ray
-    except ImportError:
-        return
-    #TODO: use ray.tune by default?
-    # from ray import tune
-    # specify exp log file
-    open(log_file_name,"w")
+    resources_per_trial = {"cpu": n_per_trial_pu, "gpu": 0}   # n_per_trial_pu
+    open(log_file_name, "w")
     search_space = problem.search_space
     init_config = problem.init_config
     low_cost_partial_config = problem.low_cost_partial_config
     # specify pruning config
     prune_attr = problem.prune_attribute
-    default_epochs, min_epochs, max_epochs = problem.prune_attribute_default_min_max #2**9, 2**1, 2**10
+    default_epochs, min_epochs, max_epochs = problem.prune_attribute_default_min_max  # 2**9, 2**1, 2**10
     cat_hp_cost = problem.cat_hp_cost
     reduction_factor_asha = 4
     reduction_factor_hyperband = 3
@@ -168,6 +161,7 @@ def _test_problem_parallel(problem, time_budget_s= 120, n_total_pu=4, n_per_tria
         # 'BlendSearch+Optuna',  'BlendSearch'
         if 'BlendSearch' in method:
             from flaml import BlendSearch
+            print('low_cost_partial_config', low_cost_partial_config)
             algo = BlendSearch(
                 points_to_evaluate=points_to_evaluate, 
                 low_cost_partial_config=low_cost_partial_config,
