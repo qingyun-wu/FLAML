@@ -24,7 +24,6 @@ def get_autohf_settings():
                        "time_budget": 100000,
                        "ckpt_per_epoch": 1,
                        "fp16": False,
-                       "ray_local_mode": True
                        }
     return autohf_settings
 
@@ -54,7 +53,7 @@ def test_hpo():
     if test_metric:
         validation_metric.update({"test": test_metric})
 
-    azure_utils = AzureUtils(root_log_path="logs_test/", autohf=autohf)
+    azure_utils = AzureUtils(root_log_path="logs_test/", data_root_dir="data/", autohf=autohf)
     azure_utils._azure_key = "test"
     azure_utils._container_name = "test"
 
