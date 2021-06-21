@@ -7,14 +7,14 @@ import pandas as pd
 from sklearn.dummy import DummyClassifier, DummyRegressor
 try:
     import ray
-except:
+except ImportError:
     print("pip install flaml[blendsearch,ray]")
-   
+
 try: 
     from flaml import tune
-except:
+except ImportError:
     from ray import tune
-
+    print('Cannot import tune from flaml. Using tune from ray')
 from flaml.model import XGBoostSklearnEstimator, LGBMEstimator
 import logging
 logger = logging.getLogger(__name__)
@@ -231,7 +231,6 @@ class AutoML(Problem):
                 X_test = self.preprocess(X_test)
                 return self.model.predict_proba(X_test)
 
-
     class LGBM_CFO(LGBMEstimator):
 
         memory_budget = 80*1024**3
@@ -240,12 +239,13 @@ class AutoML(Problem):
             super().__init__(task, n_jobs, **params)
             self.params["seed"] = 9999999
 
-        def _fit(self, X_train, y_train, **kwargs):    
-            if self.size(self.params) > self.memory_budget: 
+        def _fit(self, X_train, y_train, **kwargs):
+            if self.size(self.params) > self.memory_budget:
                 return 0
-            else: return super()._fit(X_train, y_train, **kwargs)
+            else:
+                return super()._fit(X_train, y_train, **kwargs)
 
-    
+
     class LGBM(LGBM_CFO): pass
 
 
@@ -654,8 +654,7 @@ class AutoML(Problem):
             max_leaves = 2**int(round(config['max_depth']))
             n_estimators = int(round(config['n_estimators']))
             return (max_leaves*3 + (max_leaves-1)*4 + 1.0)*n_estimators*8
-
-
+ 
     class DeepTables(BaseEstimator):
 
 
@@ -786,7 +785,7 @@ class AutoML(Problem):
             estimator = AutoML.LGBM_MLNET
         elif name == 'lgbm_mlnet_alter':
             estimator = AutoML.LGBM_MLNET_ALTER
-        elif name == 'xgb_cfo':
+        elif name == 'xgb_cfo' or name == 'xgb_flaml':
             estimator = AutoML.XGB_CFO
         elif name == 'xgb_cfo_large':
             estimator = AutoML.XGB_CFO_Large
@@ -870,28 +869,27 @@ class AutoML(Problem):
      
     def _setup_search(self):
         super()._setup_search()
-        # self._search_sapce = {}
-        # self._init_config = {} 
-        # self._prune_attribute = None
-        # self._resource_default, self._resource_min, self._resource_max = None, None, None
         try:
             space = self.estimator.search_space(self.data_size)
             self._search_space = dict((key, value['domain'])
                 for key, value in space.items())
+
+            self._init_config = dict((key, value['init_value'])
+                for key, value in space.items() if 'init_value' in value)
+            self._low_cost_partial_config = dict(
+                (key, value['low_cost_init_value']) for key, value 
+                in space.items() if 'low_cost_init_value' in value)
+            print('setup_search', self._init_config, self._low_cost_partial_config)
         except:
             print('estimator', self.estimator)
             raise NotImplementedError
         if self.estimator ==  AutoML.DeepTables:
             logger.info('setting up deeptables hpo')
-            self._init_config =  {
-            'rounds': 10,
-                }
+            self._init_config =  {'rounds': 10}
             self._prune_attribute = 'epochs'
             #TODO: _resource_default is not necessary?
             self._resource_default, self._resource_min, self._resource_max = 2**10, 2**1, 2**10 
-            self._cat_hp_cost={
-                "net": [2,1],
-                }
+            self._cat_hp_cost={"net": [2,1],}
         elif self.estimator == AutoML.XGB_BlendSearch or \
             self.estimator == AutoML.XGB_BlendSearch_Large:  
             logger.info('setting up XGB_BlendSearch or XGB_BlendSearch_Large hpo')
@@ -1114,21 +1112,15 @@ class AutoML(Problem):
         self.estimator = AutoML.get_estimator_from_name(estimator)
         self.data_size = len(self.y_train) if (self.y_train is not None) else int(
             len(self.y_all) * (self.n_splits-1) / self.n_splits)
-        # self._configure_search_setting
-        # super().__init__(**args)
         print('estimator', self.estimator)
-        self._setup_search()
         self._low_cost_partial_config = None
-
+        self._setup_search()
         print('setup search space', self._search_space)
 
     def get_test_data(self):
         _, _, X_test, y_test = AutoML.load_openml_task(
             self.task_id, self.fold, self.task_type, self.transform)
         return self.X_all, self.y_all, X_test, y_test
-        # if self.resampling_strategy == 'cv':
-        #     return self.X_all, self.y_all, X_test, y_test
-        # return self._X_train, self._y_train, X_test, y_test
         
     @staticmethod
     def load_openml_task(task_id, fold, task_type, transform):
