@@ -785,7 +785,7 @@ class AutoML(Problem):
             estimator = AutoML.LGBM_MLNET
         elif name == 'lgbm_mlnet_alter':
             estimator = AutoML.LGBM_MLNET_ALTER
-        elif name == 'xgb_cfo' or name == 'xgb_flaml':
+        elif name == 'xgb_cfo' or ('flaml' in name and 'xgb' in name):
             estimator = AutoML.XGB_CFO
         elif name == 'xgb_cfo_large':
             estimator = AutoML.XGB_CFO_Large
@@ -883,6 +883,10 @@ class AutoML(Problem):
         except:
             print('estimator', self.estimator)
             raise NotImplementedError
+        if 'woinit' in self._estimator_name or 'noinit' in self._estimator_name:
+            self._init_config = {}
+        if 'flaml' in self._estimator_name:
+            return 
         if self.estimator ==  AutoML.DeepTables:
             logger.info('setting up deeptables hpo')
             self._init_config =  {'rounds': 10}
@@ -1082,6 +1086,7 @@ class AutoML(Problem):
      resampling_strategy = None, **args): 
         
         # super().__isnit__(**args)
+        self._estimator_name = estimator
         self.name = f'{dataset}-{estimator}'
         self.time_budget = time_budget
         self.transform = True

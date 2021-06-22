@@ -39,6 +39,8 @@ def _test_problem_parallel(problem, time_budget_s=120, n_total_pu=4,
     search_space = problem.search_space
     init_config = problem.init_config
     low_cost_partial_config = problem.low_cost_partial_config
+    print('init_config', init_config)
+    print('low_cost_partial_config',low_cost_partial_config)
     # specify pruning config
     prune_attr = problem.prune_attribute
     default_epochs, min_epochs, max_epochs = problem.prune_attribute_default_min_max  # 2**9, 2**1, 2**10
@@ -72,7 +74,7 @@ def _test_problem_parallel(problem, time_budget_s=120, n_total_pu=4,
     else:
         points_to_evaluate=[init_config]
 
-    if 'BlendSearch' in method and False:
+    if 'BlendSearch' in method and True:
         # the default search_alg is BlendSearch in flaml 
         # corresponding schedulers for BS are specified in flaml.tune.run
         analysis = tune.run(
@@ -161,7 +163,7 @@ def _test_problem_parallel(problem, time_budget_s=120, n_total_pu=4,
         # 'BlendSearch+Optuna',  'BlendSearch'
         if 'BlendSearch' in method:
             from flaml import BlendSearch
-            print('low_cost_partial_config', low_cost_partial_config)
+            print('low_cost_partial_config BS', low_cost_partial_config)
             algo = BlendSearch(
                 points_to_evaluate=points_to_evaluate, 
                 low_cost_partial_config=low_cost_partial_config,
