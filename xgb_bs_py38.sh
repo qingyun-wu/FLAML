@@ -1,6 +1,3 @@
-
-sleep 44200s
-sleep 1980s
 screen -Sdm Airl-xgb_flaml_woinit-BS_D-0 bash -c "python test/test_automl_exp.py  -t 1800.0 -l xgb_flaml_woinit -d Airlines  -m BlendSearch_Depri -total_pu 4 -trial_pu 1  -r 0 >./stdout/out_Airl-xgb_flaml_woinit-BS_D-0 2>./stdout/err_Airl-xgb_flaml_woinit-BS_D-0"
 sleep 10s
 screen -Sdm Airl-xgb_flaml_woinit-BS_D-1 bash -c "python test/test_automl_exp.py  -t 1800.0 -l xgb_flaml_woinit -d Airlines  -m BlendSearch_Depri -total_pu 4 -trial_pu 1  -r 1 >./stdout/out_Airl-xgb_flaml_woinit-BS_D-1 2>./stdout/err_Airl-xgb_flaml_woinit-BS_D-1"
