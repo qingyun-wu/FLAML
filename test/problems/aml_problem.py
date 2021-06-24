@@ -6,11 +6,6 @@ from sklearn.model_selection import RepeatedStratifiedKFold, RepeatedKFold
 import pandas as pd
 from sklearn.dummy import DummyClassifier, DummyRegressor
 try:
-    import ray
-except ImportError:
-    print("pip install flaml[blendsearch,ray]")
-
-try: 
     from flaml import tune
 except ImportError:
     from ray import tune
@@ -29,6 +24,7 @@ MIN_SAMPLE_TRAIN = 10000
 MIN_SAMPLE_VAL = 10000
 CV_HOLDOUT_THRESHOLD = 100000
 
+
 def add_res(log_file_name, params_dic):
     with open(log_file_name, "a+") as f:  
         f.write(json.dumps(params_dic))
@@ -36,7 +32,12 @@ def add_res(log_file_name, params_dic):
 
 
 class Problem:
+    """The problem class which defines an AutoMLProblem task
 
+
+    Methods:
+        trainable_func()
+    """
 
     def __init__(self, **kwargs):
         self._setup_search()
@@ -66,7 +67,7 @@ class Problem:
 
     @property
     def prune_attribute(self):
-        return self._prune_attribute 
+        return self._prune_attribute
 
     @property
     def prune_attribute_default_min_max(self):
@@ -78,6 +79,13 @@ class Problem:
 
 
 class Toy(Problem):
+    """A toy problem
+
+
+    Methods:
+        compute_with_config(): the training function
+        trainable_func(config, **kwargs): a wrapper of the training function
+    """
 
     def __init__(self, **kwargs):
         self.name = 'toy'
@@ -86,14 +94,14 @@ class Toy(Problem):
     def _setup_search(self):
         super()._setup_search()
         self._search_space = {}
-        self._search_space['x'] = tune.qloguniform(1,1000000,1) 
-        self._search_space['y'] = tune.qloguniform(1,1000000,1) 
+        self._search_space['x'] = tune.qloguniform(1, 1000000, 1)
+        self._search_space['y'] = tune.qloguniform(1, 1000000, 1) 
 
     def trainable_func(self, config, **kwargs):
         _, metric2minimize, time2eval = self.compute_with_config(config)
         return metric2minimize
 
-    def compute_with_config(self, config: dict, budget_left = None, state = None):
+    def compute_with_config(self, config: dict, budget_left=None, state=None):
         curent_time = time.time()
         state = None
         # should be a function of config
@@ -101,8 +109,8 @@ class Toy(Problem):
         time2eval = time.time() - curent_time
         return state, metric2minimize, time2eval
 
-    
-class AutoML(Problem):
+
+class AutoMLProblem(Problem):
     from .openml_info import oml_tasks
     task = oml_tasks
     metric = {
@@ -112,17 +120,13 @@ class AutoML(Problem):
     }
     data_dir = 'test/automl/'
 
-
     class BaseEstimator:
         '''The abstract class for all learners
-    
         '''
 
+        MEMORY_BUDGET = 80 * 1024 ** 3
 
-        MEMORY_BUDGET = 80*1024**3
-        
-        def __init__(self, objective_name = 'binary:logistic', n_jobs = 1, 
-            memory_budget = MEMORY_BUDGET, **params):
+        def __init__(self, objective_name='binary:logistic', n_jobs=1, **params):
             '''Constructor
             
             Args:
@@ -135,7 +139,6 @@ class AutoML(Problem):
             self.estimator = DummyClassifier
             self.objective_name = objective_name
             self.n_jobs = n_jobs
-            self.memory_budget = memory_budget
             self.model = None
             self._dummy_model = None
 
@@ -145,10 +148,9 @@ class AutoML(Problem):
             try:
                 max_leaves = int(round(self.params['max_leaves']))
                 n_estimators = int(round(self.params['n_estimators']))
-            except:
-                return 0        
-            model_size = float((max_leaves*3 + (max_leaves-1)*4 + 1)*
-                n_estimators*8) 
+            except ValueError:
+                return 0    
+            model_size = float((max_leaves * 3 + (max_leaves - 1) * 4 + 1) * n_estimators * 8) 
             return model_size
             
         @property
@@ -159,11 +161,12 @@ class AutoML(Problem):
             # print('base preprocess')
             return X
 
-        def cleanup(self): pass            
+        def cleanup(self):
+            pass 
 
         def __del__(self):
             self.cleanup()
-        
+     
         def dummy_model(self, X_train, y_train):
             if self._dummy_model is None:
                 if self.objective_name == 'regression':
@@ -172,14 +175,14 @@ class AutoML(Problem):
                     self._dummy_model = DummyClassifier()
                 self._dummy_model.fit(X_train, y_train)
             return self._dummy_model
-            
 
-        def fit(self, X_train, y_train, budget = None, train_full = None):
+        def fit(self, X_train, y_train, budget=None, train_full=None):
             '''Train the model from given training data
             
             Args:
                 X_train: A numpy array of training data in shape n*m
                 y_train: A numpy array of labels in shape n*1
+                budget: time budget
 
             Returns:
                 model: An object of the trained model, with method predict(), 
@@ -188,12 +191,12 @@ class AutoML(Problem):
             '''
             curent_time = time.time()
             X_train = self.preprocess(X_train)
-            if self._size() > self.memory_budget: 
+            if self._size() > self.MEMORY_BUDGET: 
                 return None, time.time() - curent_time
             model = self.estimator(**self.params)
             model.fit(X_train, y_train)
-            train_time =  time.time() - curent_time
-            self.model=model
+            train_time = time.time() - curent_time
+            self.model = model
             return (model, train_time)
 
         def predict(self, X_test):
@@ -206,7 +209,7 @@ class AutoML(Problem):
             Returns:
                 A numpy array of shape n*1. 
                 Each element is the label for a instance
-            '''        
+            ''' 
             X_test = self.preprocess(X_test)
             return self.model.predict(X_test)
 
@@ -233,21 +236,20 @@ class AutoML(Problem):
 
     class LGBM_CFO(LGBMEstimator):
 
-        memory_budget = 80*1024**3
+        MEMORY_BUDGET = 80 * 1024 ** 3
 
         def __init__(self, task='binary', n_jobs=1, **params):
             super().__init__(task, n_jobs, **params)
             self.params["seed"] = 9999999
 
         def _fit(self, X_train, y_train, **kwargs):
-            if self.size(self.params) > self.memory_budget:
+            if self.size(self.params) > self.MEMORY_BUDGET:
                 return 0
             else:
                 return super()._fit(X_train, y_train, **kwargs)
 
-
-    class LGBM(LGBM_CFO): pass
-
+    class LGBM(LGBM_CFO):
+        pass
 
     class LGBM_Normal(LGBM_CFO):
 
@@ -267,10 +269,7 @@ class AutoML(Problem):
                 params[key] = int(round(2**(2 + np.abs(params[key] - 2))))
             super().__init__(task, n_jobs, **params)
 
-
     class LGBM_MLNET(LGBM_CFO):
-
-
         @classmethod
         def search_space(cls, data_size, **params): 
             return {
@@ -291,7 +290,6 @@ class AutoML(Problem):
                 },
             }
 
-
         def __init__(self, task='binary', n_jobs=1, **params):
             super().__init__(task, n_jobs, **params)
             # Default: ‘regression’ for LGBMRegressor, 
@@ -305,10 +303,7 @@ class AutoML(Problem):
                 "min_data_in_leaf": int(round(params["min_data_in_leaf"])),
             }
 
-
     class LGBM_MLNET_ALTER(LGBM_CFO):
-
-
         @classmethod
         def search_space(cls, data_size, **params): 
             return {
@@ -329,7 +324,6 @@ class AutoML(Problem):
                 },
             }
 
-
         def __init__(self, task='binary', n_jobs=1, **params):
             super().__init__(task, n_jobs, **params)
             # Default: ‘regression’ for LGBMRegressor, 
@@ -343,28 +337,24 @@ class AutoML(Problem):
                 "min_child_weight": params["min_child_weight"],
             }
 
-
     class XGB_CFO(XGBoostSklearnEstimator):
 
-
-        memory_budget = 80*1024**3
-
+        MEMORY_BUDGET = 80 * 1024 ** 3
         def __init__(self, task='binary', n_jobs=1, **params):
             super().__init__(task, n_jobs, **params)
             self.params["seed"] = 9999999
 
-        def _fit(self, X_train, y_train, **kwargs):    
-            if self.size(self.params) > self.memory_budget: 
+        def _fit(self, X_train, y_train, **kwargs): 
+            if self.size(self.params) > self.MEMORY_BUDGET:
                 return 0
-            else: return super()._fit(X_train, y_train, **kwargs)
+            else: 
+                return super()._fit(X_train, y_train, **kwargs)
 
-    
+  
     class XGB_CFO_Large(XGB_CFO):
-
-
         @classmethod
         def search_space(cls, data_size, **params): 
-            upper = min(32768,int(data_size))
+            upper = min(32768, int(data_size))
             return {
                 'n_estimators': {
                     'domain': tune.qloguniform(lower=4, upper=upper, q=1),
@@ -404,38 +394,35 @@ class AutoML(Problem):
                 },    
             }
 
-
     class XGB_BlendSearch(XGB_CFO):
 
-
-        def __init__(self, task = 'binary', n_jobs = 1,
-         n_estimators = 4, max_leaves = 4, subsample = 1.0, 
-         min_child_weight = 1, learning_rate = 0.1, reg_lambda = 1.0, 
-         reg_alpha = 0.0,  colsample_bylevel = 1.0, colsample_bytree = 1.0, 
-         tree_method = 'hist', booster = 'gbtree', **params):
+        def __init__(self, task='binary', n_jobs=1,
+                     n_estimators=4, max_leaves=4, subsample=1.0,
+                     min_child_weight=1, learning_rate=0.1, reg_lambda=1.0,
+                     reg_alpha=0.0, colsample_bylevel=1.0, colsample_bytree=1.0,
+                     tree_method='hist', booster='gbtree', **params):
             super().__init__(task, n_jobs)
             self.params['max_depth'] = 0
-            self.params = {
-            "n_estimators": int(round(n_estimators)),
-            'max_leaves': int(round(max_leaves)),
-            'grow_policy': 'lossguide',
-            'tree_method':tree_method,
-            'verbosity': 0,
-            'nthread': n_jobs,
-            'learning_rate': float(learning_rate),
-            'subsample': float(subsample),
-            'reg_alpha': float(reg_alpha),
-            'reg_lambda': float(reg_lambda),
-            'min_child_weight': float(min_child_weight),
-            'booster': booster,
-            'colsample_bylevel': float(colsample_bylevel),
-            'colsample_bytree': float(colsample_bytree),
-            'seed': 9999999,
-            }
+            self.params = {"n_estimators": int(round(n_estimators)),
+                           'max_leaves': int(round(max_leaves)),
+                           'grow_policy': 'lossguide',
+                           'tree_method': tree_method,
+                           'verbosity': 0,
+                           'nthread': n_jobs,
+                           'learning_rate':float(learning_rate),
+                           'subsample': float(subsample),
+                           'reg_alpha': float(reg_alpha),
+                           'reg_lambda': float(reg_lambda),
+                           'min_child_weight': float(min_child_weight),
+                           'booster': booster,
+                           'colsample_bylevel': float(colsample_bylevel),
+                           'colsample_bytree': float(colsample_bytree),
+                           'seed': 9999999,
+                            }
 
         @classmethod
         def search_space(cls, data_size, **params): 
-            upper = min(32768,int(data_size))
+            upper = min(32768, int(data_size))
             return {
                 'n_estimators': {
                     'domain': tune.qloguniform(lower=4, upper=upper, q=1),
@@ -456,11 +443,11 @@ class AutoML(Problem):
                 'subsample': {
                     'domain': tune.uniform(lower=0.6, upper=1.0),
                     'init_value': 1.0,
-                },                        
+                },                     
                 'colsample_bylevel': {
                     'domain': tune.uniform(lower=0.6, upper=1.0),
                     'init_value': 1.0,
-                },                        
+                },                    
                 'colsample_bytree': {
                     'domain': tune.uniform(lower=0.7, upper=1.0),
                     'init_value': 1.0,
@@ -482,11 +469,9 @@ class AutoML(Problem):
             }
     
     class XGB_BS_NOINIT(XGB_BlendSearch):
-
-
         @classmethod
         def search_space(cls, data_size, **params): 
-            upper = min(32768,int(data_size))
+            upper = min(32768, int(data_size))
             return {
                 'n_estimators': {
                     'domain': tune.qloguniform(lower=4, upper=upper, q=1),
@@ -529,14 +514,11 @@ class AutoML(Problem):
                     'domain': tune.choice(['auto', 'approx', 'hist']),
                 },    
             }
-    
 
     class XGB_BlendSearch_Large(XGB_BlendSearch):
-
-
         @classmethod
         def search_space(cls, data_size, **params): 
-            upper = min(32768,int(data_size))
+            upper = min(32768, int(data_size))
             return {
                 'n_estimators': {
                     'domain': tune.qloguniform(lower=4, upper=upper, q=1),
@@ -582,10 +564,7 @@ class AutoML(Problem):
                 },    
             }
 
-
     class XGB_HPOLib(XGB_CFO):
-
-
         def __init__(self, task = 'binary', n_jobs = 1, **params):
             super().__init__(task, n_jobs)
             self.params = {
@@ -656,7 +635,6 @@ class AutoML(Problem):
             return (max_leaves*3 + (max_leaves-1)*4 + 1.0)*n_estimators*8
  
     class DeepTables(BaseEstimator):
-
 
         def __init__(self, objective_name='binary', n_jobs=1, **params):
             super().__init__(objective_name, n_jobs)
@@ -776,29 +754,29 @@ class AutoML(Problem):
     @staticmethod
     def get_estimator_from_name(name):
         if name == 'lgbm_cfo':
-            estimator = AutoML.LGBM_CFO
+            estimator = AutoMLProblem.LGBM_CFO
         elif name == 'lgbm':
-            estimator = AutoML.LGBM
+            estimator = AutoMLProblem.LGBM
         elif name == 'lgbm_normal_1side':
-            estimator = AutoML.LGBM_Normal
+            estimator = AutoMLProblem.LGBM_Normal
         elif name == 'lgbm_mlnet':
-            estimator = AutoML.LGBM_MLNET
+            estimator = AutoMLProblem.LGBM_MLNET
         elif name == 'lgbm_mlnet_alter':
-            estimator = AutoML.LGBM_MLNET_ALTER
+            estimator = AutoMLProblem.LGBM_MLNET_ALTER
         elif name == 'xgb_cfo' or ('flaml' in name and 'xgb' in name):
-            estimator = AutoML.XGB_CFO
+            estimator = AutoMLProblem.XGB_CFO
         elif name == 'xgb_cfo_large':
-            estimator = AutoML.XGB_CFO_Large
+            estimator = AutoMLProblem.XGB_CFO_Large
         elif name in ('xgb_cat', 'xgb_blendsearch'):
-            estimator = AutoML.XGB_BlendSearch
+            estimator = AutoMLProblem.XGB_BlendSearch
         elif name == 'xgb_blendsearch_large':
-            estimator = AutoML.XGB_BlendSearch_Large
+            estimator = AutoMLProblem.XGB_BlendSearch_Large
         elif name == 'xgb_bs_noinit':
-            estimator = AutoML.XGB_BS_NOINIT
+            estimator = AutoMLProblem.XGB_BS_NOINIT
         elif name == 'xgb_hpolib':
-            estimator = AutoML.XGB_HPOLib
+            estimator = AutoMLProblem.XGB_HPOLib
         elif 'dt' in name or 'deeptable' in name:
-            estimator = AutoML.DeepTables
+            estimator = AutoMLProblem.DeepTables
         else: estimator = None
         return estimator
 
@@ -887,15 +865,15 @@ class AutoML(Problem):
             self._init_config = {}
         if 'flaml' in self._estimator_name:
             return 
-        if self.estimator ==  AutoML.DeepTables:
+        if self.estimator ==  AutoMLProblem.DeepTables:
             logger.info('setting up deeptables hpo')
             self._init_config =  {'rounds': 10}
             self._prune_attribute = 'epochs'
             #TODO: _resource_default is not necessary?
             self._resource_default, self._resource_min, self._resource_max = 2**10, 2**1, 2**10 
             self._cat_hp_cost={"net": [2,1],}
-        elif self.estimator == AutoML.XGB_BlendSearch or \
-            self.estimator == AutoML.XGB_BlendSearch_Large:  
+        elif self.estimator == AutoMLProblem.XGB_BlendSearch or \
+            self.estimator == AutoMLProblem.XGB_BlendSearch_Large:  
             logger.info('setting up XGB_BlendSearch or XGB_BlendSearch_Large hpo')
             self._init_config =  {
                 'n_estimators': 4,
@@ -905,14 +883,14 @@ class AutoML(Problem):
             self._cat_hp_cost={
                 "booster": [2, 1],
                 }
-        elif self.estimator == AutoML.XGB_CFO or self.estimator == AutoML.XGB_CFO_Large:
+        elif self.estimator == AutoMLProblem.XGB_CFO or self.estimator == AutoMLProblem.XGB_CFO_Large:
             logger.info('setting up XGB_CFO or XGB_CFO_Large hpo')
             self._init_config =  {
                 'n_estimators': 4,
                 'max_leaves': 4,
                 'min_child_weight': 20,
                 }   
-        elif self.estimator in (AutoML.LGBM_CFO, AutoML.LGBM, AutoML.LGBM_Normal):
+        elif self.estimator in (AutoMLProblem.LGBM_CFO, AutoMLProblem.LGBM, AutoMLProblem.LGBM_Normal):
             logger.info('setting up LGBM_CFO or LGBM hpo')
             self._init_config = dict((key, value['init_value']) for key, value 
              in self.estimator.search_space(self.data_size).items()
@@ -921,18 +899,18 @@ class AutoML(Problem):
                 (key, value['low_cost_init_value']) for key, value 
                 in self.estimator.search_space(self.data_size).items()
                 if 'low_cost_init_value' in value)
-            # if self.estimator == AutoML.LGBM_CFO:
+            # if self.estimator == AutoMLProblem.LGBM_CFO:
             #     self._init_config['min_child_weight'] = 20
             # else:
             #     self._init_config["min_data_in_leaf"] = 128
-        elif self.estimator == AutoML.XGB_HPOLib:
+        elif self.estimator == AutoMLProblem.XGB_HPOLib:
             logger.info('setting up XGB_HPOLib hpo')
             self._init_config =  {
                 'n_estimators': 1,
                 'max_depth': 1,
                 'min_child_weight': 2**7,
                 }
-        elif self.estimator in (AutoML.LGBM_MLNET, AutoML.LGBM_MLNET_ALTER):
+        elif self.estimator in (AutoMLProblem.LGBM_MLNET, AutoMLProblem.LGBM_MLNET_ALTER):
             logger.info('setting up LGBM_MLNET hpo')
             self._init_config = dict((key, value['init_value']) for key, value 
              in self.estimator.search_space(self.data_size).items()
@@ -958,7 +936,7 @@ class AutoML(Problem):
                 # print('estimator', estimator)
             elif 'r2' == metric:
                 y_pred = estimator.predict(X_test = X_test)
-            loss = AutoML.sklearn_metric_loss_score(metric, y_pred, y_test,
+            loss = AutoMLProblem.sklearn_metric_loss_score(metric, y_pred, y_test,
              labels)
             estimator.cleanup()
         return loss
@@ -1026,7 +1004,7 @@ class AutoML(Problem):
                         train_index], y_train_split[val_index] 
                 # print( 'X_iclo', X_train.iloc[0:5])               
                 if labels is not None:
-                    X_train = AutoML.concat(self.X_all[:l], X_train)
+                    X_train = AutoMLProblem.concat(self.X_all[:l], X_train)
                     y_train = np.concatenate([self.y_all[:l], y_train])
                 estimator.fit(X_train, y_train, budget_per_train)
                 val_loss_i = self._get_test_loss(estimator, X_val, y_val,
@@ -1099,9 +1077,9 @@ class AutoML(Problem):
         self.task_type = 'regression' if self.objective == 'regression' else \
             'classification'
         self.fold = fold
-        X_all, y_all, _, _ = AutoML.load_openml_task(self.task_id, fold,
+        X_all, y_all, _, _ = AutoMLProblem.load_openml_task(self.task_id, fold,
          self.task_type, self.transform)
-        # X_all, y_all, self.X_test, self.y_test = AutoML.load_openml_task(task_id, fold)
+        # X_all, y_all, self.X_test, self.y_test = AutoMLProblem.load_openml_task(task_id, fold)
         if resampling_strategy is not None: 
             self.resampling_strategy = resampling_strategy
         else: self.resampling_strategy = self._decide_eval_method(
@@ -1109,12 +1087,12 @@ class AutoML(Problem):
         print('resampling strategy')
         self.test_loss = []
         self.X_all, self.y_all, self.X_train, self.y_train, self.X_val, \
-            self.y_val, self.kf, self.labels = AutoML.split_data(
+            self.y_val, self.kf, self.labels = AutoMLProblem.split_data(
                 self.task_type, self.split_type,
                 self.split_ratio, self.n_splits, self.resampling_strategy, 
                 X_all, y_all)
         self._X_train, self._y_train = self.X_train, self.y_train
-        self.estimator = AutoML.get_estimator_from_name(estimator)
+        self.estimator = AutoMLProblem.get_estimator_from_name(estimator)
         self.data_size = len(self.y_train) if (self.y_train is not None) else int(
             len(self.y_all) * (self.n_splits-1) / self.n_splits)
         print('estimator', self.estimator)
@@ -1123,7 +1101,7 @@ class AutoML(Problem):
         print('setup search space', self._search_space)
 
     def get_test_data(self):
-        _, _, X_test, y_test = AutoML.load_openml_task(
+        _, _, X_test, y_test = AutoMLProblem.load_openml_task(
             self.task_id, self.fold, self.task_type, self.transform)
         return self.X_all, self.y_all, X_test, y_test
         
@@ -1174,8 +1152,8 @@ class AutoML(Problem):
         else:
             task = openml.tasks.get_task(task_id)
             filename = 'openml_task' + str(task_id) + '.pkl'
-            os.makedirs(AutoML.data_dir, exist_ok = True)
-            filepath = os.path.join(AutoML.data_dir, filename)
+            os.makedirs(AutoMLProblem.data_dir, exist_ok = True)
+            filepath = os.path.join(AutoMLProblem.data_dir, filename)
             if os.path.isfile(filepath):
                 print('load dataset from', filepath)
                 with open(filepath, 'rb') as f:
@@ -1205,7 +1183,7 @@ class AutoML(Problem):
                 y_test = y[test_indices]
         # print('X_all,', X_all.shape, X_all[0:5], cat_)
         if transform:
-            X_all, y_all, X_test, y_test = AutoML.transform_data(task_type,
+            X_all, y_all, X_test, y_test = AutoMLProblem.transform_data(task_type,
              X_all, y_all, X_test, y_test, cat)
         # print('X_all,', type(X_all), X_all.shape, X_all[0:5])
         return X_all, y_all, X_test, y_test
@@ -1313,11 +1291,11 @@ class AutoML(Problem):
                 X_rest, y_rest, test_size=split_ratio,
                 stratify=stratify, random_state=1)                                                                
             if task_type != 'regression':
-                X_train = AutoML.concat(X_first, X_train)
-                y_train = AutoML.concat(label_set,
+                X_train = AutoMLProblem.concat(X_first, X_train)
+                y_train = AutoMLProblem.concat(label_set,
                     y_train) if df else np.concatenate([label_set, y_train])
-                X_val = AutoML.concat(X_first, X_val)
-                y_val = AutoML.concat(label_set,
+                X_val = AutoMLProblem.concat(X_first, X_val)
+                y_val = AutoMLProblem.concat(label_set,
                     y_val) if df else np.concatenate([label_set, y_val])
         else:          
             if task_type != 'regression' and split_type == "stratified":
