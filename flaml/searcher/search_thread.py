@@ -96,7 +96,13 @@ class SearchThread:
                 not error and trial_id in self._search_alg._ot_trials):
             # optuna doesn't handle error
             if self._is_ls or not self._init_config:
-                self._search_alg.on_trial_complete(trial_id, result, error)
+                try:
+                    self._search_alg.on_trial_complete(trial_id, result, error)
+                except RuntimeError as e:
+                    # rs is used in place of optuna sometimes
+                    if not str(e).endswith(
+                       "has already finished and can not be updated."):
+                        raise e
             else:
                 # init config is not proposed by self._search_alg
                 # under this thread
@@ -124,8 +130,14 @@ class SearchThread:
         if not self._search_alg:
             return
         if not hasattr(self._search_alg, '_ot_trials') or (
-                trial_id in self._search_alg._ot_trials):
-            self._search_alg.on_trial_result(trial_id, result)
+           trial_id in self._search_alg._ot_trials):
+            try:
+                self._search_alg.on_trial_result(trial_id, result)
+            except RuntimeError as e:
+                # rs is used in place of optuna sometimes
+                if not str(e).endswith(
+                   "has already finished and can not be updated."):
+                    raise e
         if self.cost_attr in result and self.cost_last < result[self.cost_attr]:
             self.cost_last = result[self.cost_attr]
             # self._update_speed()
